@@ -1,14 +1,70 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
-
-public class PoolManager :SingletonBase<PoolManager>
+public class PoolManager : SingletonBase<PoolManager>
 {
-    Dictionary<string, List<GameObject>> poolDict = new Dictionary<string, List<GameObject>>();//key=objName,value=objInPoolList
-    Dictionary<string,GameObject>poolIndex=new Dictionary<string, GameObject>();//key=objName,value=poolObj
+    Dictionary<string, PoolData> poolDict = new Dictionary<string, PoolData>();//key=objName,value=objInPoolList
+    //Dictionary<string, GameObject> poolIndex = new Dictionary<string, GameObject>();//key=objName,value=poolObj
     private GameObject poolManager;
     private PoolManager() { poolManager = new GameObject("PoolManager"); }
+    protected class PoolData
+    {
+        private GameObject parentObject;
+        private List<GameObject> objectList=new List<GameObject>();
+        private string dataName;
+        public PoolData(string objName,GameObject poolManager)
+        {
+            dataName = objName;
+            parentObject = new GameObject(objName + "_Pool");
+            parentObject.transform.SetParent(poolManager.transform);
+        }
+        public void PushData(GameObject obj)
+        {
+            objectList.Add(obj);
+            obj.transform.SetParent(parentObject.transform);
+            obj.SetActive(false);
+        }
+        public GameObject GetData()
+        {
+            GameObject obj;
+            if (objectList.Count > 0)
+            {
+                obj = objectList[0];
+                objectList.RemoveAt(0);
+                obj.transform.parent = null;
+                obj.SetActive(true);
+                return obj;
+            }
+            obj= ResourceManager.Instance.LoadResource<GameObject>(dataName);
+            obj.name = dataName;
+            Debug.Log(obj.name);
+            return obj;
+            
+        }
+        public void GetDataAsync(UnityAction<GameObject> callback=null)
+        {
+            if (objectList.Count > 0)
+            {
+                Debug.Log(objectList.Count);
+                GameObject obj = objectList[0];
+                objectList.RemoveAt(0);
+                obj.transform.parent = null;
+                obj.SetActive(true);
+                if (callback != null)
+                {
+                    callback(obj);
+                }
+            }
+            else
+            {
+                ResourceManager.Instance.LoadResourceAsync<GameObject>(dataName, callback);
+            }
+
+        }
+    }
+
     /// <summary>
     /// used to push gameObject into pool
     /// </summary>
@@ -16,26 +72,19 @@ public class PoolManager :SingletonBase<PoolManager>
     /// <param name="obj">is the prefab instance</param>
     public void Push_Obj(string name,GameObject obj)
     {
-        if(poolDict.ContainsKey(name))
+        if (poolDict.ContainsKey(name))
         {
-            poolDict[name].Add(obj);
-            obj.transform.SetParent(poolIndex[name].transform);
-            obj.SetActive(false);
+            poolDict[name].PushData(obj);
 
         }
         else
         {
-            List<GameObject> objList = new List<GameObject>();
-            poolDict.Add(name, objList);
-            objList.Add(obj);
-            GameObject pool_Name = new GameObject(name + "_Pool");
-            pool_Name.transform.SetParent(poolManager.transform);
-            poolIndex.Add(name, pool_Name);
-            obj.transform.SetParent(pool_Name.transform);
+
+            PoolData poolData = new PoolData(name, poolManager);
+            poolData.PushData(obj);
             
             
         }
-        obj.gameObject.SetActive(false);
     }
     /// <summary>
     /// used to get gameObject from pool(Load from Resources while the pool is empty)
@@ -45,23 +94,47 @@ public class PoolManager :SingletonBase<PoolManager>
     /// <param name="direction">direction of instance</param>
     /// /// <param name="direction"></param>
     /// <returns></returns>
-    public GameObject Get_Obj(string name,Vector3 place,Quaternion direction)
+    public GameObject Get_Obj(string name,UnityAction<object> callback=null)
     {
         GameObject obj;
-        GameObject gmObj;
         if (poolDict.ContainsKey(name))
         {
-            if (poolDict[name].Count > 0)
+            obj= poolDict[name].GetData();
+            if(callback!=null)
             {
-                gmObj = poolDict[name][0];
-                gmObj.SetActive(true);
-                poolDict[name].RemoveAt(0);
-                return gmObj;
+                callback(obj);
             }
+            return obj;
         }
-            obj= Resources.Load(name) as GameObject;
-            gmObj= GameObject.Instantiate(obj,place,direction) as GameObject;
-            gmObj.name = name;
-        return gmObj;
+        else
+        {
+            PoolData poolData = new PoolData(name, poolManager);
+            poolDict.Add(name, poolData);
+            obj= poolData.GetData();
+            if (callback != null)
+            {
+                callback(obj);
+            }
+            return obj;
+        }
+    }
+    /// <summary>
+    /// get object from pool by async method
+    /// </summary>
+    /// <param name="name">object to load</param>
+    /// <param name="callback">used to do some operation of object geted</param>
+    public void Get_ObjAsync(string name, UnityAction<GameObject> callback = null)
+    {
+
+        if (poolDict.ContainsKey(name))
+        {
+            poolDict[name].GetDataAsync(callback);
+        }
+        else
+        {
+            PoolData poolData = new PoolData(name, poolManager);
+            poolDict.Add(name, poolData);
+            poolData.GetDataAsync(callback);
+        }
     }
 }

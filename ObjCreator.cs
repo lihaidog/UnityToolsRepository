@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class ObjCreator : MonoBehaviour
 {
-    // Start is called before the first frame update
+    string m_Name;
     void Start()
     {
         
@@ -15,11 +15,14 @@ public class ObjCreator : MonoBehaviour
     {
         if(Input.GetKeyDown(KeyCode.Mouse0))
         {
-            PoolManager.Instance.Get_Obj("Cube",Vector3.zero,Quaternion.identity);
+            PoolManager.Instance.Get_Obj("Cube");
         }
         if (Input.GetKeyDown(KeyCode.Mouse1))
         {
-            PoolManager.Instance.Get_Obj("Spheres/Sphere",Vector3.one,Quaternion.identity);
+            m_Name = "Spheres/Sphere";
+            PoolManager.Instance.Get_ObjAsync(m_Name,(obj)=> { obj.name = m_Name; });
         }
     }
+
+
 }

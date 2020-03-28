@@ -10,7 +10,8 @@ public class ResourceManager : SingletonBase<ResourceManager>
         T resourceLoaded = Resources.Load<T>(sourceName);
         if(resourceLoaded is GameObject)
         {
-            GameObject.Instantiate(resourceLoaded);
+           return GameObject.Instantiate(resourceLoaded);
+            
         }
         return resourceLoaded;
     }
